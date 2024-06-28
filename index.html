@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Clima</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/mapbox/assembly/publisher-staging/src/svgs/mapbox.svg">
+    <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v2.11.0/mapbox-gl.js"></script>
+    <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v2.11.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/intersection-observer@0.12.0/intersection-observer.js"></script>
+    <script src="https://unpkg.com/scrollama"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Signika:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Source Serif Pro', sans-serif;
+        }
+
+        a, a:hover, a:visited {
+            color: #000000;
+        }
+        #map {
+            top: 0;
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
+        }
+        #mapInset {
+            bottom: 50px;
+            right: 30px;
+            height: 180px;
+            width: 250px;
+            max-width: 100%;
+            position: fixed;
+            z-index: 1;
+            opacity: 1;
+            transition: opacity 0.5s ease-in-out;
+            pointer-events: none;
+        }
+        #mapInset .mapboxgl-ctrl-bottom-left {
+            display: none;
+        }
+        @media (max-width: 500px) {
+            #mapInset {
+                display: none;
+            }
+        }
+        #header {
+            margin: auto;
+            width: 100%;
+            position: relative;
+            z-index: 5;
+            background-color: #20202000;
+        }
+
+        #header h1, #header h2, #header p {
+            margin: 0;
+            padding: 1vh 4vw;
+            text-align: center; 
+        }
+        #header h1 {
+            padding-top: 10vh;
+        }
+        #footer {
+            width: 100%;
+            min-height: 5vh;
+            padding-top: 2vh;
+            padding-bottom: 2vh;
+            text-align: center;
+            line-height: 25px;
+            font-size: 13px;
+            position: relative;
+            z-index: 5;
+        }
+        #features {
+            padding-top: 10vh;
+            padding-bottom: 10vh;
+        }
+        .hidden {
+            visibility: hidden;
+        }
+        .centered {
+            width: 30vw;
+            margin: 0 auto;
+        }
+        .lefty {
+            width: 33vw;
+            margin-left: 5vw;
+        }
+        .righty {
+            width: 33vw;
+            margin-left: 62vw;
+        }
+        .fully {
+            width: 100%;
+            margin: auto;
+        }
+        .light {
+            color: #000000;
+            background-color: #ffffff;
+            border-radius: 0px;
+        }
+        .dark {
+            color: #3a2a00;
+            background-color: #14141400;
+        }
+        .step {
+            padding-bottom: 60vh;
+            opacity: 0.25;
+        }
+        .step.active {
+            opacity: 0.9;
+        }
+
+        .step div {
+            padding: 5px;
+            line-height: 25px;
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+
+        .step img {
+            width: 100%;
+        }
+
+        @media (max-width: 750px) {
+            .centered, .lefty, .righty, .fully {
+                width: 90vw;
+                margin: 0 auto;
+            }
+        }
+        #story {
+            position: relative;
+            z-index: 100;
+            color: rgba(255, 255, 255, 0.479);
+            padding: 20px;
+        }
+
+        #imageOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #3C3838;
+            display: flex;
+            justify-content: center !important;
+            align-items: center !important;
+            z-index: 10;
+        }
+
+        #fullscreenImage {
+            max-width: 100%;
+            max-height: 100vh;
+            object-fit: contain;
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        @media (max-width: 768px) {
+            #fullscreenImage {
+                max-width: 148%;
+                max-height: none;
+                object-fit: contain;
+                position: absolute;
+                top: 30%;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 10px;
+            }
+        }
+
+        .title {
+            font-size: 29px;
+        }
+        .highlight {
+            color: #B00000;
+        }
+
+        @keyframes colorFade {
+            0% { color: #0093FF; }
+            50% { color: #F6F0EC; }
+            100% { color: #FF0000; }
+        }
+        .outlined {
+            text-shadow: 
+                -0.5px -0.5px 0 #000,  
+                0.5px -0.5px 0 #000,
+                -0.5px  0.5px 0 #000,
+                0.5px  0.5px 0 #000; 
+        }
+
+        #timeline-container {
+            position: fixed;
+            bottom: 10px;
+            width: 100%;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            padding: 0;
+            margin: 0;
+        }
+
+        #timeline-bar-filled {
+            background-color: #B00000;
+            width: 0%;
+            z-index: 1;
+            position: absolute;
+            bottom: 0;
+            height: 20px;
+            left: 0;
+            margin: 0;
+        }
+
+        #timeline-bar-unfilled {
+            background-color: lightgray;
+            width: 100%;
+            z-index: 0;
+            position: absolute;
+            bottom: 0;
+            height: 20px;
+            left: 0;
+            margin: 0;
+        }
+
+        #timeline-pointer {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 20px solid black;
+            position: absolute;
+            margin-bottom: 20px;
+            transition: left 0.5s ease;
+            z-index: 130;
+        }
+
+        #timeline-label {
+            position: absolute;
+            bottom: 50px;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 15px;
+            white-space: nowrap;
+            transform: translateX(0%);
+        }
+        #timeline-pointer, #timeline-label {
+            transition: left 0.5s ease;
+        }
+
+        @media (max-width: 768px) {
+            #timeline-container {
+                bottom: 60px;
+            }
+
+            #timeline-label {
+                bottom: 50px;
+            }
+        }
+
+        .mapboxgl-canvas-container.mapboxgl-touch-zoom-rotate.mapboxgl-touch-drag-pan,
+        .mapboxgl-canvas-container.mapboxgl-touch-zoom-rotate.mapboxgl-touch-drag-pan .mapboxgl-canvas {
+            touch-action: unset;
+        }
+
+        #chartContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            bottom: 60px;
+            left: 0;
+            width: 100vw;
+            height: 25vh;
+            max-width: 100%;
+            background-color: #fff;
+            z-index: 130;
+        }
+
+        @media (max-width: 1024px) {
+            #chartContainer {
+                height: 20vh;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #chartContainer {
+                bottom: 80px;
+                height: 30vh;
+            }
+        }
+
+        .centered-container {
+            text-align: center;
+            width: 100%;
+        }
+
+        .responsive-img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        @media only screen and (min-width: 768px) {
+            #legend-img {
+                max-width: 30%;
+                height: auto;
+            }
+        }
+
+        @media only screen and (max-width: 767px) {
+            #legend-img {
+                width: 80%;
+                height: auto;
+            }
+        }
+
+        #iconMenuContainer {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            text-align: right;
+            background-color: #76C26D;
+            color: white;
+        }
+
+        #iconMenuContainer p {
+            margin: 0 0 20px;
+            color: white;
+            background-color: #76C26D;
+        }
+
+        #iconMenu a {
+            display: inline-block;
+            margin: 0 5px;
+        }
+
+        #iconMenu img {
+            width: 40px;
+            height: auto;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        #iconMenu img:hover {
+            transform: scale(1.1);
+        }
+
+        @media (min-width: 768px) {
+            #iconMenuContainer p {
+                margin: 0 0 30px;
+            }
+
+            #iconMenu img {
+                width: 50px;
+            }
+        }
+
+        .anchor-target {
+            padding-top: 100px;
+            margin-top: -100px;
+            display: block;
+        }
+        #cap12, #cap14, #cap16, #cap18, #cap19, #cap21 {
+            padding-top: 160px;
+            margin-top: -100px;
+            display: block;
+        }
+
+        #snowflakeContainer, #leafContainer, #flowerContainer, #sunbeamContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .snowflake, .leaf, .flower, .sunbeam {
+            position: absolute;
+            top: -50px;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        .snowflake {
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .leaf {
+            width: 30px;
+            height: 50px;
+            background: #941511;
+            clip-path: polygon(50% 0%, 100% 25%, 75% 50%, 100% 75%, 50% 100%, 0% 75%, 25% 50%, 0% 25%);
+        }
+
+        .flower {
+            width: 20px;
+            height: 20px;
+            background: pink;
+            border-radius: 50%;
+            clip-path: polygon(50% 0%, 65% 35%, 100% 35%, 75% 60%, 85% 100%, 50% 75%, 15% 100%, 25% 60%, 0% 35%, 35% 35%);
+        }
+
+
+        .sunbeam {
+            width: 5px;
+            height: 50px;
+            background: yellow;
+            border-radius: 50%;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100vh); }
+        }
+
+        @keyframes sunbeamFall {
+            0% { transform: translateY(-100vh); }
+            100% { transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="snowflakeContainer"></div>
+<div id="leafContainer"></div>
+<div id="flowerContainer"></div>
+<div id="sunbeamContainer"></div>
+<div id="imageOverlay">
+    <img id="fullscreenImage" src="blank.png" >
+</div>
+<div id="chartContainer" style="display: none;">
+    <canvas id="chartCanvas"></canvas>
+</div>
+<div id="timeline-container">
+    <div id="timeline-bar-filled"></div>
+    <div id="timeline-bar-unfilled"></div>
+    <div id="timeline-pointer"></div>
+    <div id="timeline-label">360 days ago</div>
+</div>
+<div id="mapInset"></div>
+<div id="story"></div>
+
+<script src="./config.js"></script>
+<script>
+var initLoad = true;
+var layerTypes = {
+    'fill': ['fill-opacity'],
+    'line': ['line-opacity'],
+    'circle': ['circle-opacity', 'circle-stroke-opacity'],
+    'symbol': ['icon-opacity', 'text-opacity'],
+    'raster': ['raster-opacity'],
+    'fill-extrusion': ['fill-extrusion-opacity'],
+    'heatmap': ['heatmap-opacity']
+}
+
+var alignments = {
+    'left': 'lefty',
+    'center': 'centered',
+    'right': 'righty',
+    'full': 'fully'
+}
+
+function getLayerPaintType(layer) {
+    var layerType = map.getLayer(layer).type;
+    return layerTypes[layerType];
+}
+
+function setLayerOpacity(layer) {
+    var paintProps = getLayerPaintType(layer.layer);
+    paintProps.forEach(function(prop) {
+        var options = {};
+        if (layer.duration) {
+            var transitionProp = prop + "-transition";
+            options = { "duration": layer.duration };
+            map.setPaintProperty(layer.layer, transitionProp, options);
+        }
+        map.setPaintProperty(layer.layer, prop, layer.opacity, options);
+    });
+}
+
+var story = document.getElementById('story');
+var features = document.createElement('div');
+features.setAttribute('id', 'features');
+
+var header = document.createElement('div');
+
+if (config.title) {
+    var titleText = document.createElement('h1');
+    titleText.innerHTML = config.title;
+    header.appendChild(titleText);
+}
+
+if (config.subtitle) {
+    var subtitleText = document.createElement('h2');
+    subtitleText.innerHTML = config.subtitle;
+    header.appendChild(subtitleText);
+}
+
+if (config.byline) {
+    var bylineText = document.createElement('p');
+    bylineText.innerHTML = config.byline;
+    header.appendChild(bylineText);
+}
+
+if (header.innerText.length > 0) {
+    header.classList.add(config.theme);
+    header.setAttribute('id', 'header');
+    story.appendChild(header);
+}
+
+config.chapters.forEach((record, idx) => {
+    var container = document.createElement('div');
+    var chapter = document.createElement('div');
+
+    if (record.title) {
+        var title = document.createElement('h3');
+        title.innerHTML = record.title;
+        chapter.appendChild(title);
+    }
+
+    if (record.image) {
+        var image = new Image();
+        image.src = record.image;
+        chapter.appendChild(image);
+    }
+
+    if (record.description) {
+        var story = document.createElement('p');
+        story.innerHTML = record.description;
+        chapter.appendChild(story);
+    }
+
+    container.setAttribute('id', record.id);
+    container.classList.add('step');
+    if (idx === 0) {
+        container.classList.add('active');
+    }
+
+    chapter.classList.add(config.theme);
+    container.appendChild(chapter);
+    container.classList.add(alignments[record.alignment] || 'centered');
+    if (record.hidden) {
+        container.classList.add('hidden');
+    }
+    features.appendChild(container);
+});
+
+story.appendChild(features);
+
+var footer = document.createElement('div');
+
+if (config.footer) {
+    var footerText = document.createElement('p');
+    footerText.innerHTML = config.footer;
+    footer.appendChild(footerText);
+}
+
+if (footer.innerText.length > 0) {
+    footer.classList.add(config.theme);
+    footer.setAttribute('id', 'footer');
+    story.appendChild(footer);
+}
+
+mapboxgl.accessToken = config.accessToken;
+
+const transformRequest = (url) => {
+    const hasQuery = url.indexOf("?") !== -1;
+    const suffix = hasQuery ? "&pluginName=scrollytellingV2" : "?pluginName=scrollytellingV2";
+    return {
+    url: url + suffix
+    }
+}
+
+var map = new mapboxgl.Map({
+    container: 'map',
+    style: config.style,
+    center: config.chapters[0].location.center,
+    zoom: config.chapters[0].location.zoom,
+    bearing: config.chapters[0].location.bearing,
+    pitch: config.chapters[0].location.pitch,
+    interactive: false,
+    transformRequest: transformRequest,
+    projection: config.projection
+});
+
+// Create a inset map if enabled in config.js
+if (config.inset) {
+ var insetMap = new mapboxgl.Map({
+    container: 'mapInset',
+    style: 'mapbox://styles/ed1990/clshd5fko001d01qw5qk66k79',
+    center: config.chapters[0].location.center,
+    zoom: 3,
+    hash: false,
+    interactive: false,
+    attributionControl: false,
+  });
+}
+
+if (config.showMarkers) {
+    var marker = new mapboxgl.Marker({ color: config.markerColor });
+    marker.setLngLat(config.chapters[0].location.center).addTo(map);
+}
+
+// instantiate the scrollama
+var scroller = scrollama();
+
+map.on("load", function() {
+    if (config.use3dTerrain) {
+        map.addSource('mapbox-dem', {
+            'type': 'raster-dem',
+            'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            'tileSize': 512,
+            'maxzoom': 14
+        });
+        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+
+        map.addLayer({
+            'id': 'sky',
+            'type': 'sky',
+            'paint': {
+                'sky-type': 'atmosphere',
+                'sky-atmosphere-sun': [0.0, 0.0],
+                'sky-atmosphere-sun-intensity': 15
+            }
+        });
+    }
+
+    if (config.inset) {
+        map.on('move', getInsetBounds);
+    }
+
+    scroller
+    .setup({
+        step: '.step',
+        offset: 0.5,
+        progress: true
+    })
+    .onStepEnter(async response => {
+        var current_chapter = config.chapters.findIndex(chap => chap.id === response.element.id);
+        var chapter = config.chapters[current_chapter];
+
+        // Clear all effects before applying the new one
+        clearAllEffects();
+
+        if(chapter.mapStyle && map.getStyle().styleURL !== chapter.mapStyle) {
+            map.setStyle(chapter.mapStyle);
+            map.once('style.load', () => {});
+        }
+
+        response.element.classList.add('active');
+        map[chapter.mapAnimation || 'flyTo'](chapter.location);
+
+        if (config.inset) {
+            if (chapter.location.zoom < 5) {
+                insetMap.flyTo({ center: chapter.location.center, zoom: 0 });
+            } else {
+                insetMap.flyTo({ center: chapter.location.center, zoom: 3 });
+            }
+        }
+        if (config.showMarkers) {
+            marker.setLngLat(chapter.location.center);
+        }
+        if (chapter.onChapterEnter.length > 0) {
+            chapter.onChapterEnter.forEach(layer => {
+                setLayerOpacity(layer);
+            });
+        }
+
+        // Trigger effects based on chapter ID
+        if (['cap2', 'cap3'].includes(chapter.id)) {
+            createSnowflakes();
+        } 
+        if (['cap6'].includes(chapter.id)) {
+            createLeaves();
+        } 
+        if (['cap4',].includes(chapter.id)) {
+            createFlowers();
+        } 
+        if (['cap5',].includes(chapter.id)) {
+            createSunbeams();
+        }
+
+        if (chapter.rotateAnimation) {
+            map.once('moveend', () => {
+                const rotateNumber = map.getBearing();
+                map.rotateTo(rotateNumber + 180, {
+                    duration: 30000, easing: function (t) {
+                        return t;
+                    }
+                });
+            });
+        }
+
+        if (config.auto) {
+            var next_chapter = (current_chapter + 1) % config.chapters.length;
+            map.once('moveend', () => {
+                document.querySelectorAll('[data-scrollama-index="' + next_chapter.toString() + '"]')[0].scrollIntoView();
+            });
+        }
+
+        const imageOverlayDiv = document.getElementById('imageOverlay');
+        const fullscreenImage = document.getElementById('fullscreenImage');
+
+        if (chapter.overlayImage) {
+            fullscreenImage.src = chapter.overlayImage;
+            imageOverlayDiv.style.display = 'flex';
+        } else {
+            imageOverlayDiv.style.display = 'none';
+        }
+
+        var timelineVisibility = chapter.showTimeline ? 'visible' : 'hidden';
+        document.getElementById('timeline-container').style.visibility = timelineVisibility;
+
+        var daysAgo = chapter.daysAgo;
+        var totalDays = 85;
+        var positionPercent = ((totalDays - daysAgo) / totalDays) * 100;
+        var pointer = document.getElementById('timeline-pointer');
+        pointer.style.left = `${positionPercent}%`;
+        var filledBar = document.getElementById('timeline-bar-filled');
+        filledBar.style.width = `${positionPercent}%`;
+        var label = document.getElementById('timeline-label');
+        label.innerHTML = `<span style="color: #B00000; font-weight: bold; font-size: 20px;">${daysAgo}</span> ani în urmă`;
+        label.style.left = `${positionPercent}%`;
+
+        if (positionPercent <= 5) {
+            label.style.left = "0%";
+        } else if (positionPercent >= 95) {
+            label.style.left = "unset";
+            label.style.right = "0%";
+        } else {
+            label.style.right = "unset";
+        }
+
+        var chartContainer = document.getElementById('chartContainer');
+        if (chapter.chartData) {
+            chartContainer.style.display = 'block';
+            updateOrCreateChart(chapter);
+        } else {
+            chartContainer.style.display = 'none';
+        }
+    })
+
+    .onStepExit(response => {
+        var chapter = config.chapters.find(chap => chap.id === response.element.id);
+        response.element.classList.remove('active');
+        if (chapter.onChapterExit.length > 0) {
+            chapter.onChapterExit.forEach(setLayerOpacity);
+        }
+
+        // Clear effects when exiting any chapter
+        clearAllEffects();
+
+        if ((response.index === 0 && response.direction === 'up') || response.direction === 'up') {
+            document.getElementById('chartContainer').style.display = 'none';
+        }
+    });
+
+    if (config.auto) {
+        document.querySelectorAll('[data-scrollama-index="0"]')[0].scrollIntoView();
+    }
+});
+
+function getInsetBounds() {
+    let bounds = map.getBounds();
+    let boundsJson = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            bounds._sw.lng,
+                            bounds._sw.lat
+                        ],
+                        [
+                            bounds._ne.lng,
+                            bounds._sw.lat
+                        ],
+                        [
+                            bounds._ne.lng,
+                            bounds._ne.lat
+                        ],
+                        [
+                            bounds._sw.lng,
+                            bounds._ne.lat
+                        ],
+                        [
+                            bounds._sw.lng,
+                            bounds._sw.lat
+                        ]
+                    ]
+                ]
+            }
+        }]
+    }
+
+    if (initLoad) {
+        addInsetLayer(boundsJson);
+        initLoad = false;
+    } else {
+        updateInsetLayer(boundsJson);
+    }
+}
+
+function addInsetLayer(bounds) {
+    insetMap.addSource('boundsSource', {
+        'type': 'geojson',
+        'data': bounds
+    });
+
+    insetMap.addLayer({
+        'id': 'boundsLayer',
+        'type': 'fill',
+        'source': 'boundsSource',
+        'layout': {},
+        'paint': {
+            'fill-color': '#fff',
+            'fill-opacity': 0.2
+        }
+    });
+
+    insetMap.addLayer({
+        'id': 'outlineLayer',
+        'type': 'line',
+        'source': 'boundsSource',
+        'layout': {},
+        'paint': {
+            'line-color': '#000',
+            'line-width': 1
+        }
+    });
+}
+
+function updateInsetLayer(bounds) {
+    insetMap.getSource('boundsSource').setData(bounds);
+}
+
+var chartInstance;
+
+function updateOrCreateChart(chapter) {
+    var chartContainer = document.getElementById('chartCanvas').getContext('2d');
+    var chartData = chapter.chartData;
+
+    var data = {
+        labels: chartData.labels,
+        datasets: [{
+            label: chartData.label,
+            data: chartData.dataPoints,
+            backgroundColor: 'rgba(176, 30, 35, 0.2)',
+            borderColor: 'rgba(176, 30, 35, 1)',
+            fill: true,
+        }]
+    };
+
+    var options = {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        aspectRatio: 2,
+        plugins: {
+            legend: {
+                display: false,
+            },
+            title: {
+                display: true,
+                text: chapter.chartTitle
+            }
+        },
+        scales: {
+            y: {
+                min: chapter.yAxisMin,
+                max: chapter.yAxisMax,
+                title: {
+                    display: true,
+                    text: 'Value'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: ''
+                }
+            }
+        },
+        tooltips: {
+            enabled: true,
+            mode: 'index',
+            intersect: false,
+        },
+        hover: {
+            mode: 'nearest',
+            intersect: true
+        },
+    };
+
+    if (chartInstance) {
+        chartInstance.data = data;
+        chartInstance.options = options;
+        chartInstance.update();
+    } else {
+        chartInstance = new Chart(chartContainer, {
+            type: 'line',
+            data: data,
+            options: options
+        });
+    }
+
+    if (chapter.hiddenValues) {
+        hideValues(chapter.hiddenValues);
+    }
+}
+
+function hideValues(hiddenValues) {
+    hiddenValues.forEach(value => {
+        var index = chartInstance.data.labels.indexOf(value);
+        if (index !== -1) {
+            chartInstance.data.datasets[0].data[index] = null;
+        }
+    });
+    chartInstance.update();
+}
+
+let snowflakeInterval, leafInterval, flowerInterval, sunbeamInterval;
+
+function createSnowflakes() {
+    const snowflakeContainer = document.getElementById('snowflakeContainer');
+    clearInterval(snowflakeInterval);
+    snowflakeInterval = setInterval(() => {
+        const snowflake = document.createElement('div');
+        snowflake.classList.add('snowflake');
+        snowflake.style.left = `${Math.random() * 100}vw`;
+        snowflake.style.animationDuration = `${Math.random() * 5 + 3}s`; // Adjust speed here
+        snowflake.style.animationDelay = `${Math.random() * 0}s`; // Adjust delay here
+        snowflakeContainer.appendChild(snowflake);
+        snowflake.style.animationName = 'fall';
+        setTimeout(() => snowflake.remove(), 10000); // Remove after animation
+    }, 200);
+}
+
+function clearSnowflakes() {
+    clearInterval(snowflakeInterval);
+    const snowflakeContainer = document.getElementById('snowflakeContainer');
+    snowflakeContainer.innerHTML = '';
+}
+
+function createLeaves() {
+    const leafContainer = document.getElementById('leafContainer');
+    clearInterval(leafInterval);
+    leafInterval = setInterval(() => {
+        const leaf = document.createElement('div');
+        leaf.classList.add('leaf');
+        leaf.style.left = `${Math.random() * 100}vw`;
+        leaf.style.animationDuration = `${Math.random() * 6 + 4}s`; // Adjust speed here
+        leaf.style.animationDelay = `${Math.random() * 3}s`; // Adjust delay here
+        leafContainer.appendChild(leaf);
+        leaf.style.animationName = 'fall';
+        setTimeout(() => leaf.remove(), 10000); // Remove after animation
+    }, 200);
+}
+
+function clearLeaves() {
+    clearInterval(leafInterval);
+    const leafContainer = document.getElementById('leafContainer');
+    leafContainer.innerHTML = '';
+}
+
+function createFlowers() {
+    const flowerContainer = document.getElementById('flowerContainer');
+    clearInterval(flowerInterval);
+    flowerInterval = setInterval(() => {
+        const flower = document.createElement('div');
+        flower.classList.add('flower');
+        flower.style.left = `${Math.random() * 100}vw`;
+        flower.style.animationDuration = `${Math.random() * 4 + 2}s`; // Adjust speed here
+        flower.style.animationDelay = `${Math.random() * 2}s`; // Adjust delay here
+        flowerContainer.appendChild(flower);
+        flower.style.animationName = 'fall';
+        setTimeout(() => flower.remove(), 10000); // Remove after animation
+    }, 200);
+}
+
+function clearFlowers() {
+    clearInterval(flowerInterval);
+    const flowerContainer = document.getElementById('flowerContainer');
+    flowerContainer.innerHTML = '';
+}
+
+function createSunbeams() {
+    const sunbeamContainer = document.getElementById('sunbeamContainer');
+    clearInterval(sunbeamInterval);
+    sunbeamInterval = setInterval(() => {
+        const sunbeam = document.createElement('div');
+        sunbeam.classList.add('sunbeam');
+        sunbeam.style.left = `${Math.random() * 100}vw`;
+        sunbeam.style.animationDuration = `${Math.random() * 7 + 3}s`; // Adjust speed here
+        sunbeam.style.animationDelay = `${Math.random() * 3}s`; // Adjust delay here
+        sunbeamContainer.appendChild(sunbeam);
+        sunbeam.style.animationName = 'sunbeamFall';
+        setTimeout(() => sunbeam.remove(), 10000); // Remove after animation
+    }, 200);
+}
+
+function clearSunbeams() {
+    clearInterval(sunbeamInterval);
+    const sunbeamContainer = document.getElementById('sunbeamContainer');
+    sunbeamContainer.innerHTML = '';
+}
+
+function clearAllEffects() {
+    clearSnowflakes();
+    clearLeaves();
+    clearFlowers();
+    clearSunbeams();
+}
+
+function adjustImageForAspectRatio() {
+    const image = document.getElementById('fullscreenImage');
+    if (!image) return;
+
+    if (window.innerWidth / window.innerHeight > image.naturalWidth / image.naturalHeight) {
+        image.style.width = 'auto';
+        image.style.height = 'auto';
+    } else {
+        image.style.width = 'auto';
+        image.style.height = 'auto';
+    }
+}
+
+window.onload = () => {
+    adjustImageForAspectRatio();
+    window.addEventListener('resize', adjustImageForAspectRatio);
+};
+
+document.addEventListener("DOMContentLoaded", function() {
+    var firstChapter = config.chapters[0];
+    var timelineVisibility = firstChapter.showTimeline ? 'visible' : 'hidden';
+    document.getElementById('timeline-container').style.visibility = timelineVisibility;
+});
+
+window.addEventListener('resize', scroller.resize);
+</script>
+</body>
+</html>
